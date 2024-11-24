@@ -1,43 +1,63 @@
-LIBDIR=$(DESTDIR)/usr/lib
-INCDIR=$(DESTDIR)/usr/include
-MANDIR=$(DESTDIR)/usr/share/man/man2
+# Build tools
+CC := clang
+AR := llvm-ar
 
-PATH=/usr/i386-linux-cgc/bin:/bin:/usr/bin
+# Build sources
+LIB_DIR 	= lib
+LIB_SRC  	= $(wildcard $(LIB_DIR)/*.c)
+SRC_DIR 	= src
+SRC 		= $(wildcard $(SRC_DIR)/*.c)
+INC     	= include
 
-.SUFFIXES: .md .2.gz
+# Build output configuration
+BUILD_DIR       	= build
+BUILD_BIN_DIR 		= $(BUILD_DIR)/bin
+BUILD_LIB_DIR    	= $(BUILD_DIR)/lib
+BUILD_OBJ_DIR    	= $(BUILD_DIR)/obj
+BUILD_OBJ_LIB_DIR 	= $(BUILD_OBJ_DIR)/lib
+BUILD_OBJ_SRC_DIR 	= $(BUILD_OBJ_DIR)/src
 
-ASFLAGS=
+# Build targets
+LIB       	= libcgc
+STATIC_LIB 	= $(BUILD_LIB_DIR)/$(LIB).a
+SHARED_LIB 	= $(BUILD_LIB_DIR)/$(LIB).so
+LIB_OBJ    	= $(patsubst $(LIB_DIR)/%.c,$(BUILD_OBJ_LIB_DIR)/%.o,$(LIB_SRC))
+BIN 		= $(BUILD_BIN_DIR)/test
+BIN_OBJ 	= $(patsubst $(SRC_DIR)/%.c,$(BUILD_OBJ_SRC_DIR)/%.o,$(SRC))
 
-%.2.gz: %.md
-	pandoc -s -t man $< | gzip -9 > $@
+# Build configuration
+LIB_IFLAGS  = -I$(INC)
+LIB_CFLAGS  = -fPIC
+LIB_LDFLAGS = -lm
+LIB_WFLAGS  = -Wno-unused-value -Wno-unused-command-line-argument
+IFLAGS 		= -I$(INC)
+CFLAGS 		= -O0 -g
+LDFLAGS 	= -lm
+WFLAGS 		=
 
-all: libcgc.a \
-	allocate.2.gz deallocate.2.gz fdwait.2.gz random.2.gz receive.2.gz \
-	_terminate.2.gz transmit.2.gz cgcabi.2.gz
+all: build
 
-libcgc.a: libcgc.o maths.o
-	$(AR) cruv $@ libcgc.o maths.o
+build: prep $(BIN) $(SHAREDLIB) $(STATICLIB)
 
-libcgc.o: libcgc.s
-	$(AS) -o $@ $< $(ASFLAGS)
+prep:
+	mkdir -p $(BUILD_LIB_DIR) $(BUILD_BIN_DIR) $(BUILD_OBJ_LIB_DIR) $(BUILD_OBJ_SRC_DIR)
 
-maths.o: maths.s
-	$(AS) -o $@ $< $(ASFLAGS)
+$(SHARED_LIB): $(LIB_OBJ)
+	$(CC) -o $@ -shared $^ $(LIB_CFLAGS) $(LIB_IFLAGS) $(LIB_LDFLAGS) $(LIB_WFLAGS)
 
-install: libcgc.a
-	install -d $(LIBDIR)
-	install -d $(INCDIR)
-	install libcgc.a $(LIBDIR)
-	install libcgc.h $(INCDIR)
-	install -d $(MANDIR)
-	install -m 444 allocate.2.gz $(MANDIR)
-	install -m 444 cgcabi.2.gz $(MANDIR)
-	install -m 444 deallocate.2.gz $(MANDIR)
-	install -m 444 fdwait.2.gz $(MANDIR)
-	install -m 444 random.2.gz $(MANDIR)
-	install -m 444 receive.2.gz $(MANDIR)
-	install -m 444 _terminate.2.gz $(MANDIR)
-	install -m 444 transmit.2.gz $(MANDIR)
+$(STATIC_LIB): $(LIB_OBJ)
+	$(AR) rcs $@ $^
+
+$(BIN): $(BIN_OBJ) $(STATIC_LIB)
+	$(CC) -o $@ $^ $(CFLAGS) $(IFLAGS) $(LDFLAGS) $(WFLAGS)
+
+$(BUILD_OBJ_LIB_DIR)/%.o: $(LIB_DIR)/%.c
+	$(CC) -c -o $@ $< $(LIB_CFLAGS) $(LIB_IFLAGS) $(LIB_WFLAGS)
+
+$(BUILD_OBJ_SRC_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) -c -o $@ $< $(CFLAGS) $(IFLAGS) $(WFLAGS)
 
 clean:
-	rm -f libcgc.[oa] *.2.gz maths.o
+	rm -rf $(BUILD_DIR)
+
+.PHONY: all prep build clean
