@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <setjmp.h>  // Used by libcgc
+#include <setjmp.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
